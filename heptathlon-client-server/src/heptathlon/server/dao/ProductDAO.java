@@ -62,6 +62,52 @@ public class ProductDAO {
         return references;
     }
 
+    public List<String> findAvailableFamilies() {
+        List<String> families = new ArrayList<>();
+        String sql = """
+                SELECT DISTINCT family
+                FROM products
+                WHERE stock_quantity > 0
+                ORDER BY family
+                """;
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+
+            while (rs.next()) {
+                families.add(rs.getString("family"));
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Erreur lors de la lecture des familles", e);
+        }
+
+        return families;
+    }
+
+    public List<Product> findAll() {
+        List<Product> products = new ArrayList<>();
+        String sql = "SELECT * FROM products ORDER BY family, reference";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+
+            while (rs.next()) {
+                products.add(new Product(
+                        rs.getString("reference"),
+                        rs.getString("family"),
+                        rs.getDouble("unit_price"),
+                        rs.getInt("stock_quantity")
+                ));
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Erreur lors de la lecture du stock", e);
+        }
+
+        return products;
+    }
+
     public boolean addStock(String reference, int quantity) {
         if (quantity <= 0) {
             return false;

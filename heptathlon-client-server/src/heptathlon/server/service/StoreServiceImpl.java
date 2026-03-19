@@ -33,8 +33,18 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
     }
 
     @Override
+    public List<String> getAvailableFamilies() throws RemoteException {
+        return productDAO.findAvailableFamilies();
+    }
+
+    @Override
     public List<String> searchAvailableReferencesByFamily(String family) throws RemoteException {
         return productDAO.findAvailableByFamily(family);
+    }
+
+    @Override
+    public List<Product> getAllProducts() throws RemoteException {
+        return productDAO.findAll();
     }
 
     @Override
@@ -117,6 +127,15 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
         }
 
         return invoiceDAO.findById(invoiceId);
+    }
+
+    @Override
+    public List<Invoice> getInvoicesByDate(LocalDate date) throws RemoteException {
+        if (date == null) {
+            return List.of();
+        }
+
+        return invoiceDAO.findByDate(date);
     }
 
     @Override

@@ -14,7 +14,11 @@ public interface StoreService extends Remote {
 
     Product getProductByReference(String reference) throws RemoteException;
 
+    List<String> getAvailableFamilies() throws RemoteException;
+
     List<String> searchAvailableReferencesByFamily(String family) throws RemoteException;
+
+    List<Product> getAllProducts() throws RemoteException;
 
     boolean addStock(String reference, int quantity) throws RemoteException;
 
@@ -25,6 +29,8 @@ public interface StoreService extends Remote {
     boolean payInvoice(int invoiceId, PaymentMode paymentMode) throws RemoteException;
 
     Invoice getInvoiceById(int invoiceId) throws RemoteException;
+
+    List<Invoice> getInvoicesByDate(LocalDate date) throws RemoteException;
 
     double getRevenueByDate(LocalDate date) throws RemoteException;
 }

@@ -153,6 +153,35 @@ public class InvoiceDAO {
         }
     }
 
+    public List<Invoice> findByDate(LocalDate date) {
+        List<Invoice> invoices = new ArrayList<>();
+        String sql = """
+                SELECT id
+                FROM invoices
+                WHERE billing_date = ?
+                ORDER BY id DESC
+                """;
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setDate(1, Date.valueOf(date));
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    Invoice invoice = findById(resultSet.getInt("id"));
+                    if (invoice != null) {
+                        invoices.add(invoice);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Erreur lors de la recherche des factures pour la date " + date, e);
+        }
+
+        return invoices;
+    }
+
     public double getRevenueByDate(LocalDate date) {
         String sql = "SELECT COALESCE(SUM(total_amount), 0) AS revenue FROM invoices WHERE billing_date = ? AND paid = true";
 
