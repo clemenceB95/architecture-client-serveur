@@ -16,6 +16,11 @@ public class ProductDAO {
 
     private static final Logger logger = Logger.getLogger(ProductDAO.class.getName());
 
+    private Integer readNullableStock(ResultSet rs) throws SQLException {
+        int stockQuantity = rs.getInt("stock_quantity");
+        return rs.wasNull() ? null : stockQuantity;
+    }
+
     public Product findByReference(String reference) {
         String sql = "SELECT * FROM products WHERE reference = ?";
 
@@ -30,7 +35,7 @@ public class ProductDAO {
                             rs.getString("reference"),
                             rs.getString("family"),
                             rs.getDouble("unit_price"),
-                            rs.getInt("stock_quantity")
+                            readNullableStock(rs)
                     );
                 }
             }
@@ -98,7 +103,7 @@ public class ProductDAO {
                         rs.getString("reference"),
                         rs.getString("family"),
                         rs.getDouble("unit_price"),
-                        rs.getInt("stock_quantity")
+                        readNullableStock(rs)
                 ));
             }
         } catch (SQLException e) {
@@ -114,6 +119,7 @@ public class ProductDAO {
         }
 
         String sql = "UPDATE products SET stock_quantity = stock_quantity + ? WHERE reference = ?";
+        sql = "UPDATE products SET stock_quantity = COALESCE(stock_quantity, 0) + ? WHERE reference = ?";
 
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -141,7 +147,7 @@ public class ProductDAO {
                             rs.getString("reference"),
                             rs.getString("family"),
                             rs.getDouble("unit_price"),
-                            rs.getInt("stock_quantity")
+                            readNullableStock(rs)
                     );
                 }
             }

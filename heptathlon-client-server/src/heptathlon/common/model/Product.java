@@ -11,12 +11,12 @@ public class Product implements Serializable {
     private String reference;
     private String family;
     private double unitPrice;
-    private int stockQuantity;
+    private Integer stockQuantity;
 
     public Product() {
     }
 
-    public Product(String reference, String family, double unitPrice, int stockQuantity) {
+    public Product(String reference, String family, double unitPrice, Integer stockQuantity) {
         this.reference = reference;
         this.family = family;
         this.unitPrice = unitPrice;
@@ -35,11 +35,11 @@ public class Product implements Serializable {
         return unitPrice;
     }
 
-    public int getStockQuantity() {
+    public Integer getStockQuantity() {
         return stockQuantity;
     }
 
-    public void setStockQuantity(int stockQuantity) {
+    public void setStockQuantity(Integer stockQuantity) {
         this.stockQuantity = stockQuantity;
     }
 }

@@ -79,7 +79,9 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
                     }
 
                     Product product = productDAO.findByReference(connection, item.getProductReference());
-                    if (product == null || product.getStockQuantity() < item.getQuantity()) {
+                    if (product == null
+                            || product.getStockQuantity() == null
+                            || product.getStockQuantity() < item.getQuantity()) {
                         connection.rollback();
                         return null;
                     }

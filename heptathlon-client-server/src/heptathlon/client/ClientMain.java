@@ -784,6 +784,11 @@ public class ClientMain {
             return count;
         }
 
+        private String formatStockQuantity(Product product) {
+            Integer stockQuantity = product.getStockQuantity();
+            return stockQuantity == null ? "NULL" : String.valueOf(stockQuantity);
+        }
+
         private String formatProduct(Product product) {
             return """
                     Produit
@@ -791,12 +796,12 @@ public class ClientMain {
                     Reference : %s
                     Famille   : %s
                     Prix      : %.2f EUR
-                    Stock     : %d
+                    Stock     : %s
                     """.formatted(
                     product.getReference(),
                     product.getFamily(),
                     product.getUnitPrice(),
-                    product.getStockQuantity()
+                    formatStockQuantity(product)
             ).trim();
         }
 
