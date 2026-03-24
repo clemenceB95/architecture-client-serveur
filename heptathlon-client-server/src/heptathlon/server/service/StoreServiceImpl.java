@@ -27,6 +27,14 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
         this.invoiceDAO = new InvoiceDAO();
     }
 
+    public ProductDAO getProductDAO() {
+        return productDAO;
+    }
+
+    public InvoiceDAO getInvoiceDAO() {
+        return invoiceDAO;
+    }
+
     @Override
     public Product getProductByReference(String reference) throws RemoteException {
         return productDAO.findByReference(reference);

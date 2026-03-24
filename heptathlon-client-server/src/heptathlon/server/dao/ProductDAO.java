@@ -118,8 +118,7 @@ public class ProductDAO {
             return false;
         }
 
-        String sql = "UPDATE products SET stock_quantity = stock_quantity + ? WHERE reference = ?";
-        sql = "UPDATE products SET stock_quantity = COALESCE(stock_quantity, 0) + ? WHERE reference = ?";
+        String sql = "UPDATE products SET stock_quantity = COALESCE(stock_quantity, 0) + ? WHERE reference = ?";
 
         try (Connection connection = DatabaseConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -130,6 +129,27 @@ public class ProductDAO {
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             logger.log(Level.SEVERE, "Erreur lors de l'ajout de stock pour le produit " + reference, e);
+        }
+
+        return false;
+    }
+
+    public boolean updateUnitPrice(String reference, double unitPrice) {
+        if (reference == null || reference.isBlank() || unitPrice < 0) {
+            return false;
+        }
+
+        String sql = "UPDATE products SET unit_price = ? WHERE reference = ?";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setDouble(1, unitPrice);
+            statement.setString(2, reference);
+
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Erreur lors de la mise a jour du prix pour le produit " + reference, e);
         }
 
         return false;

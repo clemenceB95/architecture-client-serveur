@@ -253,8 +253,8 @@ public class ClientMain {
                     gbc,
                     4,
                     createActionRow(
-                            createPrimaryButton("Acheter", this::handlePurchase),
-                            createSecondaryButton("Acheter et payer", this::handlePurchaseAndPay)
+                            createPrimaryButton("Commander et payer en magasin", this::handlePurchase),
+                            createSecondaryButton("Acheter et payer en ligne", this::handlePurchaseAndPay)
                     )
             );
 

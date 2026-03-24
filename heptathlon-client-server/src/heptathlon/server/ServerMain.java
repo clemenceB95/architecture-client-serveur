@@ -1,6 +1,7 @@
 package heptathlon.server;
 
 import heptathlon.server.database.DatabaseInitializer;
+import heptathlon.server.service.HeadOfficeSyncService;
 import heptathlon.server.service.StoreServiceImpl;
 
 import java.rmi.registry.LocateRegistry;
@@ -19,9 +20,14 @@ public class ServerMain {
 
             logger.info("Création du service RMI...");
             StoreServiceImpl service = new StoreServiceImpl();
+            HeadOfficeSyncService headOfficeSyncService = new HeadOfficeSyncService(
+                    service.getProductDAO(),
+                    service.getInvoiceDAO()
+            );
 
             Registry registry = LocateRegistry.createRegistry(1099);
             registry.rebind("StoreService", service);
+            headOfficeSyncService.start();
 
             logger.info("Serveur RMI démarré sur le port 1099.");
         } catch (Exception e) {
