@@ -18,7 +18,7 @@ public class Invoice implements Serializable {
     private final PaymentMode paymentMode;
     private final LocalDate billingDate;
     private final boolean paid;
-    private final List<InvoiceItem> items;
+    private final ArrayList<InvoiceItem> items;
 
     public Invoice(int id,
                    String clientName,

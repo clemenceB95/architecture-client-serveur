@@ -47,6 +47,7 @@ import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.CardLayout;
 import java.awt.geom.RoundRectangle2D;
+import java.io.Serial;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -67,7 +68,7 @@ public class ClientMain {
         void run() throws Exception;
     }
 
-    public static void main(String[] args) {
+     public static void main(String[] ignoredArgs) {
         SwingUtilities.invokeLater(() -> {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -92,6 +93,9 @@ public class ClientMain {
 
     private static final class ClientFrame extends JFrame {
 
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         private static final Color APP_BACKGROUND = new Color(236, 242, 248);
         private static final Color PANEL_BACKGROUND = Color.WHITE;
         private static final Color PRIMARY_BLUE = new Color(0, 102, 204);
@@ -103,7 +107,7 @@ public class ClientMain {
         private static final String SIDE_CARD_RESULTS = "results";
         private static final String SIDE_CARD_CART = "cart";
 
-        private final StoreService service;
+        private final transient StoreService service;
         private final JTextArea resultArea;
         private final JLabel sidePanelTitleLabel;
         private final JPanel sideContentPanel;
@@ -118,8 +122,8 @@ public class ClientMain {
         private final JSpinner purchaseQuantitySpinner;
         private final JLabel purchaseStockLabel;
         private final JPanel purchaseCartPanel;
-        private final List<CartItem> purchaseCartItems;
-        private final List<Product> purchaseCatalog;
+        private final transient List<CartItem> purchaseCartItems;
+        private final transient List<Product> purchaseCatalog;
 
         private final JTextField invoiceIdField;
         private final JTextField paymentInvoiceIdField;
@@ -236,7 +240,7 @@ public class ClientMain {
             tabs.addTab("Factures", wrapTab(createInvoicesTab()));
             tabs.addTab("Chiffre d'affaires", wrapTab(createRevenueTab()));
             tabs.addTab("Stock", wrapTab(createStockTab()));
-            tabs.addChangeListener(event -> refreshResultsPanel());
+            tabs.addChangeListener(ignored -> refreshResultsPanel());
             return tabs;
         }
 
@@ -261,7 +265,7 @@ public class ClientMain {
             addFieldRow(familyPanel, familyConstraints, 0, "Famille", familyComboBox);
             addButtonRow(familyPanel, familyConstraints, 1, createSecondaryButton("Rafraichir", this::handleRefreshFamilies));
 
-            familyComboBox.addActionListener(event -> {
+            familyComboBox.addActionListener(ignored -> {
                 if (!suppressFamilySelectionEvents) {
                     runRemoteAction(this::handleFamilySelection);
                 }
@@ -544,7 +548,7 @@ public class ClientMain {
             comboBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
             comboBox.setBackground(FIELD_BACKGROUND);
             comboBox.setForeground(TEXT_COLOR);
-            comboBox.addActionListener(event -> updateSelectedProductStockLabel());
+            comboBox.addActionListener(ignored -> updateSelectedProductStockLabel());
             return comboBox;
         }
 
@@ -580,13 +584,13 @@ public class ClientMain {
 
         private JButton createPrimaryButton(String text, RemoteAction action) {
             JButton button = createButton(text, PRIMARY_BLUE, Color.WHITE);
-            button.addActionListener(event -> runRemoteAction(action));
+            button.addActionListener(ignored -> runRemoteAction(action));
             return button;
         }
 
         private JButton createSecondaryButton(String text, RemoteAction action) {
             JButton button = createButton(text, new Color(229, 237, 251), PRIMARY_BLUE_DARK);
-            button.addActionListener(event -> runRemoteAction(action));
+            button.addActionListener(ignored -> runRemoteAction(action));
             return button;
         }
 
@@ -613,7 +617,7 @@ public class ClientMain {
             button.setPreferredSize(new Dimension(54, 42));
             button.setMaximumSize(new Dimension(54, 42));
             button.setToolTipText("Retirer du panier");
-            button.addActionListener(event -> runRemoteAction(action));
+            button.addActionListener(ignored -> runRemoteAction(action));
             return button;
         }
 
@@ -1243,6 +1247,9 @@ public class ClientMain {
         }
 
         private static final class GradientPanel extends JPanel {
+
+            @Serial
+            private static final long serialVersionUID = 1L;
             @Override
             protected void paintComponent(Graphics graphics) {
                 Graphics2D g2d = (Graphics2D) graphics.create();

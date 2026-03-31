@@ -9,6 +9,7 @@ import heptathlon.server.dao.InvoiceDAO;
 import heptathlon.server.dao.ProductDAO;
 import heptathlon.server.database.DatabaseConnection;
 
+import java.io.Serial;
 import java.sql.Connection;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -18,8 +19,11 @@ import java.util.List;
 
 public class StoreServiceImpl extends UnicastRemoteObject implements StoreService {
 
-    private final ProductDAO productDAO;
-    private final InvoiceDAO invoiceDAO;
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private final transient ProductDAO productDAO;
+    private final transient InvoiceDAO invoiceDAO;
 
     public StoreServiceImpl() throws RemoteException {
         super();
