@@ -4,6 +4,7 @@ import heptathlon.common.model.Invoice;
 import heptathlon.common.model.InvoiceItem;
 import heptathlon.common.model.PaymentMode;
 import heptathlon.common.model.Product;
+import heptathlon.common.model.PurchaseItem;
 import heptathlon.common.service.StoreService;
 
 import javax.swing.BorderFactory;
@@ -12,6 +13,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -28,6 +30,8 @@ import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.Icon;
 import java.awt.BorderLayout;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -41,13 +45,19 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.CardLayout;
+import java.awt.geom.RoundRectangle2D;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.format.DateTimeParseException;
 import java.util.Date;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ClientMain {
@@ -87,50 +97,74 @@ public class ClientMain {
         private static final Color PRIMARY_BLUE = new Color(0, 102, 204);
         private static final Color PRIMARY_BLUE_DARK = new Color(0, 63, 136);
         private static final Color ACCENT_ORANGE = new Color(255, 120, 41);
+        private static final Color DANGER_RED = new Color(198, 40, 40);
         private static final Color FIELD_BACKGROUND = new Color(247, 250, 253);
         private static final Color TEXT_COLOR = new Color(24, 33, 49);
+        private static final String SIDE_CARD_RESULTS = "results";
+        private static final String SIDE_CARD_CART = "cart";
 
         private final StoreService service;
         private final JTextArea resultArea;
+        private final JLabel sidePanelTitleLabel;
+        private final JPanel sideContentPanel;
+        private final CardLayout sideContentLayout;
 
         private final JTextField productReferenceField;
         private final JComboBox<String> familyComboBox;
 
         private final JTextField purchaseClientField;
-        private final JTextField purchaseReferenceField;
-        private final JSpinner purchaseQuantitySpinner;
         private final JComboBox<PaymentMode> purchasePaymentModeComboBox;
+        private final JComboBox<ProductOption> purchaseProductComboBox;
+        private final JSpinner purchaseQuantitySpinner;
+        private final JLabel purchaseStockLabel;
+        private final JPanel purchaseCartPanel;
+        private final List<CartItem> purchaseCartItems;
+        private final List<Product> purchaseCatalog;
 
         private final JTextField invoiceIdField;
         private final JTextField paymentInvoiceIdField;
         private final JComboBox<PaymentMode> paymentModeComboBox;
         private final JSpinner revenueDateSpinner;
+        private final JButton downloadInvoiceButton;
 
         private final JTextField stockReferenceField;
         private final JSpinner stockQuantitySpinner;
+        private JTabbedPane tabs;
+        private Invoice lastPurchasedInvoice;
+        private String lastPurchaseResultMessage;
+        private boolean showPurchaseResultInSidePanel;
         private boolean suppressFamilySelectionEvents;
 
         private ClientFrame(StoreService service) throws Exception {
             super("Heptathlon");
             this.service = service;
             this.resultArea = createResultArea();
+            this.sidePanelTitleLabel = new JLabel("Resultats");
+            this.sideContentLayout = new CardLayout();
+            this.sideContentPanel = new JPanel(sideContentLayout);
             this.productReferenceField = createTextField();
             this.familyComboBox = createFamilyComboBox();
             this.purchaseClientField = createTextField();
-            this.purchaseReferenceField = createTextField();
-            this.purchaseQuantitySpinner = createQuantitySpinner();
             this.purchasePaymentModeComboBox = new JComboBox<>(PaymentMode.values());
+            this.purchaseProductComboBox = createProductComboBox();
+            this.purchaseQuantitySpinner = createQuantitySpinner();
+            this.purchaseStockLabel = new JLabel();
+            this.purchaseCartPanel = new JPanel();
+            this.purchaseCartItems = new ArrayList<>();
+            this.purchaseCatalog = new ArrayList<>();
             this.invoiceIdField = createTextField();
             this.paymentInvoiceIdField = createTextField();
             this.paymentModeComboBox = new JComboBox<>(PaymentMode.values());
             this.revenueDateSpinner = createDateSpinner();
+            this.downloadInvoiceButton = createSecondaryButton("Telecharger la facture", this::handleDownloadInvoice);
             this.stockReferenceField = createTextField();
             this.stockQuantitySpinner = createQuantitySpinner();
 
             configureFrame();
             setContentPane(createMainPanel());
             loadFamilies();
-            log("Connexion au serveur reussie.");
+            loadPurchaseProducts();
+            refreshResultsPanel();
         }
 
         private void configureFrame() {
@@ -193,7 +227,7 @@ public class ClientMain {
         }
 
         private JTabbedPane createTabs() {
-            JTabbedPane tabs = new JTabbedPane();
+            tabs = new JTabbedPane();
             tabs.setFont(new Font("Segoe UI", Font.BOLD, 13));
             tabs.setBackground(PANEL_BACKGROUND);
             tabs.setForeground(TEXT_COLOR);
@@ -202,6 +236,7 @@ public class ClientMain {
             tabs.addTab("Factures", wrapTab(createInvoicesTab()));
             tabs.addTab("Chiffre d'affaires", wrapTab(createRevenueTab()));
             tabs.addTab("Stock", wrapTab(createStockTab()));
+            tabs.addChangeListener(event -> refreshResultsPanel());
             return tabs;
         }
 
@@ -243,15 +278,15 @@ public class ClientMain {
             JPanel tab = createTabPanel();
 
             JPanel purchasePanel = createSectionPanel("Acheter un article");
+            purchasePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 620));
             GridBagConstraints gbc = createConstraints();
             addFieldRow(purchasePanel, gbc, 0, "Client", purchaseClientField);
-            addFieldRow(purchasePanel, gbc, 1, "Reference", purchaseReferenceField);
-            addFieldRow(purchasePanel, gbc, 2, "Quantite", purchaseQuantitySpinner);
-            addFieldRow(purchasePanel, gbc, 3, "Paiement direct", purchasePaymentModeComboBox);
+            addFieldRow(purchasePanel, gbc, 1, "Selection", createPurchaseSelectorSection());
+            addFieldRow(purchasePanel, gbc, 2, "Paiement direct", purchasePaymentModeComboBox);
             addButtonRow(
                     purchasePanel,
                     gbc,
-                    4,
+                    3,
                     createActionRow(
                             createPrimaryButton("Commander et payer en magasin", this::handlePurchase),
                             createSecondaryButton("Acheter et payer en ligne", this::handlePurchaseAndPay)
@@ -332,17 +367,75 @@ public class ClientMain {
                     new EmptyBorder(14, 16, 14, 16)
             ));
 
-            JLabel title = new JLabel("Resultats");
-            title.setForeground(TEXT_COLOR);
-            title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            sidePanelTitleLabel.setForeground(TEXT_COLOR);
+            sidePanelTitleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
 
-            JScrollPane scrollPane = new JScrollPane(resultArea);
-            scrollPane.setBorder(BorderFactory.createEmptyBorder());
-            scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            JScrollPane resultScrollPane = new JScrollPane(resultArea);
+            resultScrollPane.setBorder(BorderFactory.createEmptyBorder());
+            resultScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-            panel.add(title, BorderLayout.NORTH);
-            panel.add(scrollPane, BorderLayout.CENTER);
+            sideContentPanel.setOpaque(false);
+            sideContentPanel.add(resultScrollPane, SIDE_CARD_RESULTS);
+            sideContentPanel.add(createPurchaseCartSection(), SIDE_CARD_CART);
+
+            panel.add(sidePanelTitleLabel, BorderLayout.NORTH);
+            panel.add(sideContentPanel, BorderLayout.CENTER);
+            panel.add(createResultsActionsPanel(), BorderLayout.SOUTH);
             return panel;
+        }
+
+        private JPanel createResultsActionsPanel() {
+            JPanel panel = new JPanel();
+            panel.setOpaque(false);
+            panel.setBorder(new EmptyBorder(12, 0, 0, 0));
+            panel.setLayout(new BoxLayout(panel, BoxLayout.X_AXIS));
+            downloadInvoiceButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+            panel.add(downloadInvoiceButton);
+            panel.add(Box.createHorizontalGlue());
+            return panel;
+        }
+
+        private JPanel createPurchaseSelectorSection() {
+            JPanel panel = new JPanel();
+            panel.setOpaque(false);
+            panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+
+            JPanel productRow = new JPanel();
+            productRow.setOpaque(false);
+            productRow.setLayout(new BoxLayout(productRow, BoxLayout.X_AXIS));
+            productRow.add(purchaseProductComboBox);
+
+            JPanel actionRow = new JPanel();
+            actionRow.setOpaque(false);
+            actionRow.setBorder(new EmptyBorder(10, 0, 0, 0));
+            actionRow.setLayout(new BoxLayout(actionRow, BoxLayout.X_AXIS));
+            actionRow.add(createInlineLabel("Quantite"));
+            actionRow.add(Box.createHorizontalStrut(8));
+            actionRow.add(purchaseQuantitySpinner);
+            actionRow.add(Box.createHorizontalStrut(12));
+            actionRow.add(createSecondaryButton("Ajouter au panier", this::handleAddSelectedProductToCart));
+            actionRow.add(Box.createHorizontalGlue());
+
+            purchaseStockLabel.setForeground(PRIMARY_BLUE_DARK);
+            purchaseStockLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            purchaseStockLabel.setBorder(new EmptyBorder(8, 0, 0, 0));
+
+            panel.add(productRow);
+            panel.add(actionRow);
+            panel.add(purchaseStockLabel);
+            return panel;
+        }
+
+        private JScrollPane createPurchaseCartSection() {
+            purchaseCartPanel.setOpaque(false);
+            purchaseCartPanel.setLayout(new BoxLayout(purchaseCartPanel, BoxLayout.Y_AXIS));
+            refreshPurchaseCartPanel();
+
+            JScrollPane scrollPane = new JScrollPane(purchaseCartPanel);
+            scrollPane.setBorder(BorderFactory.createEmptyBorder());
+            scrollPane.getViewport().setBackground(new Color(250, 252, 255));
+            scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            return scrollPane;
         }
 
         private JPanel createTabPanel() {
@@ -444,10 +537,22 @@ public class ClientMain {
             return comboBox;
         }
 
+        private JComboBox<ProductOption> createProductComboBox() {
+            JComboBox<ProductOption> comboBox = new JComboBox<>();
+            comboBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            comboBox.setPreferredSize(new Dimension(520, 34));
+            comboBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+            comboBox.setBackground(FIELD_BACKGROUND);
+            comboBox.setForeground(TEXT_COLOR);
+            comboBox.addActionListener(event -> updateSelectedProductStockLabel());
+            return comboBox;
+        }
+
         private JSpinner createQuantitySpinner() {
             JSpinner spinner = new JSpinner(new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1));
             spinner.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            spinner.setPreferredSize(new Dimension(220, 34));
+            spinner.setPreferredSize(new Dimension(120, 34));
+            spinner.setMaximumSize(new Dimension(120, 34));
             spinner.getEditor().getComponent(0).setBackground(FIELD_BACKGROUND);
             return spinner;
         }
@@ -502,6 +607,16 @@ public class ClientMain {
             return button;
         }
 
+        private JButton createDangerIconButton(RemoteAction action) {
+            JButton button = createButton("", DANGER_RED, Color.WHITE);
+            button.setIcon(new TrashIcon(16, 16, Color.WHITE));
+            button.setPreferredSize(new Dimension(54, 42));
+            button.setMaximumSize(new Dimension(54, 42));
+            button.setToolTipText("Retirer du panier");
+            button.addActionListener(event -> runRemoteAction(action));
+            return button;
+        }
+
         private void runRemoteAction(RemoteAction action) {
             try {
                 action.run();
@@ -535,6 +650,12 @@ public class ClientMain {
                 }
             }
             suppressFamilySelectionEvents = false;
+        }
+
+        private void loadPurchaseProducts() throws Exception {
+            purchaseCatalog.clear();
+            purchaseCatalog.addAll(service.getAllProducts());
+            refreshPurchaseProductOptions();
         }
 
         private void handleRefreshFamilies() throws Exception {
@@ -593,34 +714,65 @@ public class ClientMain {
 
         private void processPurchase(boolean payImmediately) throws Exception {
             String clientName = requireText(purchaseClientField, "le nom du client");
-            String reference = requireText(purchaseReferenceField, "la reference du produit");
-            int quantity = requirePositiveSpinnerValue(purchaseQuantitySpinner, "la quantite");
+            List<PurchaseItem> items = buildPurchaseItems();
 
-            Invoice invoice = service.purchaseArticle(clientName, reference, quantity);
+            Invoice invoice = service.purchaseArticles(clientName, items);
             if (invoice == null) {
-                log("Achat impossible. Verifie le stock ou la reference du produit.");
+                log("Achat impossible. Verifie le stock ou les references des produits.");
                 return;
             }
 
             paymentInvoiceIdField.setText(String.valueOf(invoice.getId()));
             invoiceIdField.setText(String.valueOf(invoice.getId()));
+            lastPurchasedInvoice = invoice;
+            showPurchaseResultInSidePanel = true;
+            updateDownloadInvoiceButtonState();
 
             if (payImmediately) {
                 PaymentMode selectedMode = (PaymentMode) purchasePaymentModeComboBox.getSelectedItem();
                 boolean paid = service.payInvoice(invoice.getId(), selectedMode);
                 if (paid) {
                     invoice = service.getInvoiceById(invoice.getId());
+                    lastPurchasedInvoice = invoice;
+                    showPurchaseResultInSidePanel = true;
+                    updateDownloadInvoiceButtonState();
                     paymentModeComboBox.setSelectedItem(selectedMode);
-                    log("Achat et paiement enregistres.\n\n" + formatInvoice(invoice));
+                    showPurchaseInvoice("Achat et paiement enregistres.\n\n", invoice);
                 } else {
-                    log("Achat enregistre, mais le paiement immediat a echoue.\n\n" + formatInvoice(invoice));
+                    showPurchaseResultInSidePanel = true;
+                    showPurchaseInvoice("Achat enregistre, mais le paiement immediat a echoue.\n\n", invoice);
                 }
             } else {
-                log("Achat enregistre.\nLa facture peut etre reglee plus tard en magasin depuis l'onglet Factures.\n\n"
-                        + formatInvoice(invoice));
+                showPurchaseResultInSidePanel = true;
+                showPurchaseInvoice(
+                        "Achat enregistre.\nLa facture peut etre reglee plus tard en magasin depuis l'onglet Factures.\n\n",
+                        invoice
+                );
             }
 
+            clearPurchaseCart();
             loadFamilies();
+            loadPurchaseProducts();
+        }
+
+        private void handleAddSelectedProductToCart() {
+            ProductOption selectedOption = (ProductOption) purchaseProductComboBox.getSelectedItem();
+            if (selectedOption == null) {
+                throw new IllegalArgumentException("Aucun produit disponible a ajouter.");
+            }
+
+            int quantity = requirePositiveSpinnerValue(purchaseQuantitySpinner, "la quantite");
+            Product product = selectedOption.product();
+            if (product.getStockQuantity() == null || quantity > product.getStockQuantity()) {
+                throw new IllegalArgumentException("Quantite indisponible pour le produit selectionne.");
+            }
+
+            purchaseCartItems.add(new CartItem(product, quantity));
+            showPurchaseResultInSidePanel = false;
+            purchaseQuantitySpinner.setValue(1);
+            refreshPurchaseCartPanel();
+            refreshPurchaseProductOptions();
+            refreshResultsPanel();
         }
 
         private void handleShowInvoice() throws Exception {
@@ -630,7 +782,7 @@ public class ClientMain {
                 log("Facture introuvable.");
                 return;
             }
-            log(formatInvoice(invoice));
+            showInvoice("", invoice);
         }
 
         private void handlePayInvoice() throws Exception {
@@ -642,7 +794,11 @@ public class ClientMain {
                 return;
             }
             Invoice invoice = service.getInvoiceById(invoiceId);
-            log("Facture payee.\n\n" + (invoice == null ? "" : formatInvoice(invoice)));
+            if (invoice == null) {
+                log("Facture payee.");
+                return;
+            }
+            showInvoice("Facture payee.\n\n", invoice);
         }
 
         private void handleShowRevenue() throws Exception {
@@ -710,6 +866,7 @@ public class ClientMain {
             Product product = service.getProductByReference(reference);
             log("Stock mis a jour.\n\n" + (product == null ? reference : formatProduct(product)));
             loadFamilies();
+            loadPurchaseProducts();
         }
 
         private void handleShowStock() throws Exception {
@@ -747,6 +904,18 @@ public class ClientMain {
             return number.intValue();
         }
 
+        private List<PurchaseItem> buildPurchaseItems() {
+            if (purchaseCartItems.isEmpty()) {
+                throw new IllegalArgumentException("Ajoute au moins un produit au panier.");
+            }
+
+            List<PurchaseItem> items = new ArrayList<>();
+            for (CartItem item : purchaseCartItems) {
+                items.add(new PurchaseItem(item.product().getReference(), item.quantity()));
+            }
+            return items;
+        }
+
         private int parsePositiveInteger(String input, String fieldName) {
             try {
                 int value = Integer.parseInt(input.trim());
@@ -756,14 +925,6 @@ public class ClientMain {
                 return value;
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("Saisie invalide pour " + fieldName + ".");
-            }
-        }
-
-        private LocalDate parseDate(String input) {
-            try {
-                return LocalDate.parse(input.trim());
-            } catch (DateTimeParseException | NullPointerException e) {
-                throw new IllegalArgumentException("Saisie invalide pour la date. Format attendu : YYYY-MM-DD.");
             }
         }
 
@@ -782,6 +943,241 @@ public class ClientMain {
                 }
             }
             return count;
+        }
+
+        private void handleDownloadInvoice() throws Exception {
+            if (lastPurchasedInvoice == null) {
+                throw new IllegalArgumentException("Aucune facture a telecharger.");
+            }
+
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("Enregistrer la facture");
+            chooser.setFileFilter(new FileNameExtensionFilter("Fichier texte (*.txt)", "txt"));
+            chooser.setSelectedFile(new java.io.File("facture-" + lastPurchasedInvoice.getId() + ".txt"));
+
+            int result = chooser.showSaveDialog(this);
+            if (result != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
+
+            Path targetPath = chooser.getSelectedFile().toPath();
+            if (!targetPath.getFileName().toString().toLowerCase().endsWith(".txt")) {
+                targetPath = targetPath.resolveSibling(targetPath.getFileName() + ".txt");
+            }
+
+            try {
+                Files.writeString(targetPath, formatInvoice(lastPurchasedInvoice), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                showError("Impossible d'enregistrer la facture : " + e.getMessage());
+            }
+        }
+
+        private void showInvoice(String prefix, Invoice invoice) {
+            log(prefix + formatInvoice(invoice));
+        }
+
+        private void showPurchaseInvoice(String prefix, Invoice invoice) {
+            lastPurchaseResultMessage = prefix + formatInvoice(invoice);
+            showPurchaseResultInSidePanel = true;
+            refreshResultsPanel();
+        }
+
+        private void updateDownloadInvoiceButtonState() {
+            boolean isPurchaseTabSelected = tabs != null && tabs.getSelectedIndex() == 1;
+            boolean visible = isPurchaseTabSelected && showPurchaseResultInSidePanel && lastPurchasedInvoice != null;
+            downloadInvoiceButton.setVisible(visible);
+            downloadInvoiceButton.setEnabled(visible);
+        }
+
+        private void refreshResultsPanel() {
+            updateDownloadInvoiceButtonState();
+            if (tabs != null && tabs.getSelectedIndex() == 1) {
+                if (showPurchaseResultInSidePanel && lastPurchaseResultMessage != null) {
+                    sidePanelTitleLabel.setText("Resultats");
+                    sideContentLayout.show(sideContentPanel, SIDE_CARD_RESULTS);
+                    log(lastPurchaseResultMessage);
+                    return;
+                }
+                sidePanelTitleLabel.setText("Panier");
+                sideContentLayout.show(sideContentPanel, SIDE_CARD_CART);
+                return;
+            }
+            sidePanelTitleLabel.setText("Resultats");
+            sideContentLayout.show(sideContentPanel, SIDE_CARD_RESULTS);
+            log("");
+        }
+
+        private JLabel createInlineLabel(String text) {
+            JLabel label = new JLabel(text);
+            label.setForeground(TEXT_COLOR);
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            return label;
+        }
+
+        private void updateSelectedProductStockLabel() {
+            ProductOption selectedOption = (ProductOption) purchaseProductComboBox.getSelectedItem();
+            if (selectedOption == null) {
+                purchaseStockLabel.setText("Aucun produit disponible.");
+                return;
+            }
+
+            Product product = selectedOption.product();
+            purchaseStockLabel.setText(
+                    "Famille : " + product.getFamily()
+                            + " | Prix : " + String.format("%.2f", product.getUnitPrice()) + " EUR"
+                            + " | Stock disponible : " + selectedOption.availableStock()
+            );
+        }
+
+        private void refreshPurchaseCartPanel() {
+            purchaseCartPanel.removeAll();
+
+            if (purchaseCartItems.isEmpty()) {
+                JLabel emptyLabel = createInlineLabel("Panier vide. Selectionne un produit puis clique sur Ajouter au panier.");
+                emptyLabel.setForeground(new Color(104, 118, 138));
+                purchaseCartPanel.add(emptyLabel);
+            } else {
+                for (CartItem item : purchaseCartItems) {
+                    purchaseCartPanel.add(createCartItemRow(item));
+                    purchaseCartPanel.add(Box.createVerticalStrut(8));
+                }
+                purchaseCartPanel.add(Box.createVerticalStrut(8));
+                purchaseCartPanel.add(createCartTotalRow());
+            }
+
+            purchaseCartPanel.revalidate();
+            purchaseCartPanel.repaint();
+        }
+
+        private JPanel createCartItemRow(CartItem item) {
+            JPanel row = new JPanel();
+            row.setOpaque(true);
+            row.setBackground(new Color(245, 248, 252));
+            row.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(220, 229, 239)),
+                    new EmptyBorder(10, 12, 10, 12)
+            ));
+            row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+
+            JPanel textPanel = new JPanel();
+            textPanel.setOpaque(false);
+            textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+
+            JLabel mainLabel = createInlineLabel(
+                    item.product().getReference()
+                            + " | " + item.product().getFamily()
+            );
+            mainLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+            JLabel detailsLabel = createInlineLabel(
+                    "Quantite : x" + item.quantity()
+                            + " | Total : " + String.format("%.2f", item.product().getUnitPrice() * item.quantity()) + " EUR"
+            );
+            detailsLabel.setForeground(new Color(88, 101, 118));
+
+            JButton removeButton = createDangerIconButton(() -> handleRemoveCartItem(item));
+
+            textPanel.add(mainLabel);
+            textPanel.add(Box.createVerticalStrut(4));
+            textPanel.add(detailsLabel);
+
+            row.add(textPanel);
+            row.add(Box.createHorizontalGlue());
+            row.add(removeButton);
+            return row;
+        }
+
+        private JPanel createCartTotalRow() {
+            JPanel row = new JPanel();
+            row.setOpaque(false);
+            row.setBorder(new EmptyBorder(6, 4, 0, 4));
+            row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
+
+            double total = 0;
+            for (CartItem item : purchaseCartItems) {
+                total += item.product().getUnitPrice() * item.quantity();
+            }
+
+            JLabel totalLabel = new JLabel("Total panier : " + String.format("%.2f", total) + " EUR");
+            totalLabel.setForeground(PRIMARY_BLUE_DARK);
+            totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+            row.add(Box.createHorizontalGlue());
+            row.add(totalLabel);
+            return row;
+        }
+
+        private void handleRemoveCartItem(CartItem item) {
+            purchaseCartItems.remove(item);
+            if (!purchaseCartItems.isEmpty()) {
+                showPurchaseResultInSidePanel = false;
+            }
+            refreshPurchaseCartPanel();
+            refreshPurchaseProductOptions();
+            refreshResultsPanel();
+        }
+
+        private void clearPurchaseCart() {
+            purchaseCartItems.clear();
+            refreshPurchaseCartPanel();
+            refreshPurchaseProductOptions();
+        }
+
+        private void refreshPurchaseProductOptions() {
+            ProductOption selectedOption = (ProductOption) purchaseProductComboBox.getSelectedItem();
+            String selectedReference = selectedOption == null ? null : selectedOption.product().getReference();
+
+            purchaseProductComboBox.removeAllItems();
+            for (Product product : purchaseCatalog) {
+                int availableStock = getAvailableStockForPurchase(product);
+                if (availableStock > 0) {
+                    purchaseProductComboBox.addItem(new ProductOption(product, availableStock));
+                }
+            }
+
+            if (selectedReference != null) {
+                for (int i = 0; i < purchaseProductComboBox.getItemCount(); i++) {
+                    ProductOption option = purchaseProductComboBox.getItemAt(i);
+                    if (selectedReference.equals(option.product().getReference())) {
+                        purchaseProductComboBox.setSelectedIndex(i);
+                        updateSelectedProductStockLabel();
+                        return;
+                    }
+                }
+            }
+
+            if (purchaseProductComboBox.getItemCount() > 0) {
+                purchaseProductComboBox.setSelectedIndex(0);
+            }
+            updateSelectedProductStockLabel();
+        }
+
+        private int getAvailableStockForPurchase(Product product) {
+            Integer stockQuantity = product.getStockQuantity();
+            if (stockQuantity == null || stockQuantity <= 0) {
+                return 0;
+            }
+
+            int reservedQuantity = 0;
+            for (CartItem item : purchaseCartItems) {
+                if (product.getReference().equals(item.product().getReference())) {
+                    reservedQuantity += item.quantity();
+                }
+            }
+            return Math.max(0, stockQuantity - reservedQuantity);
+        }
+
+        private record ProductOption(Product product, int availableStock) {
+            @Override
+            public String toString() {
+                return product.getReference()
+                        + " | " + product.getFamily()
+                        + " | " + String.format("%.2f", product.getUnitPrice()) + " EUR"
+                        + " | stock: " + availableStock;
+            }
+        }
+
+        private record CartItem(Product product, int quantity) {
         }
 
         private String formatStockQuantity(Product product) {
@@ -863,6 +1259,50 @@ public class ClientMain {
 
             private GradientPanel() {
                 setOpaque(false);
+            }
+        }
+
+        private static final class TrashIcon implements Icon {
+            private final int width;
+            private final int height;
+            private final Color color;
+
+            private TrashIcon(int width, int height, Color color) {
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            @Override
+            public void paintIcon(Component component, Graphics graphics, int x, int y) {
+                Graphics2D g2d = (Graphics2D) graphics.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(color);
+
+                int lidY = y + 3;
+                int bodyY = y + 6;
+                int bodyHeight = height - 7;
+                int bodyX = x + 3;
+                int bodyWidth = width - 6;
+
+                g2d.fillRoundRect(x + 4, y + 1, width - 8, 2, 2, 2);
+                g2d.fillRect(x + (width / 2) - 2, y, 4, 2);
+                g2d.drawLine(x + 2, lidY, x + width - 2, lidY);
+                g2d.draw(new RoundRectangle2D.Double(bodyX, bodyY, bodyWidth, bodyHeight, 3, 3));
+                g2d.drawLine(x + 6, y + 8, x + 6, y + height - 3);
+                g2d.drawLine(x + (width / 2), y + 8, x + (width / 2), y + height - 3);
+                g2d.drawLine(x + width - 6, y + 8, x + width - 6, y + height - 3);
+                g2d.dispose();
+            }
+
+            @Override
+            public int getIconWidth() {
+                return width;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return height;
             }
         }
     }
