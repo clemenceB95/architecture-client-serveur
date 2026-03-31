@@ -24,6 +24,7 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
 
     private final transient ProductDAO productDAO;
     private final transient InvoiceDAO invoiceDAO;
+    private transient HeadOfficeSyncService headOfficeSyncService;
 
     public StoreServiceImpl() throws RemoteException {
         super();
@@ -37,6 +38,10 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
 
     public InvoiceDAO getInvoiceDAO() {
         return invoiceDAO;
+    }
+
+    public void setHeadOfficeSyncService(HeadOfficeSyncService headOfficeSyncService) {
+        this.headOfficeSyncService = headOfficeSyncService;
     }
 
     @Override
@@ -159,5 +164,15 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
         }
 
         return invoiceDAO.getRevenueByDate(date);
+    }
+
+    @Override
+    public boolean triggerInvoiceBackup() throws RemoteException {
+        if (headOfficeSyncService == null) {
+            return false;
+        }
+
+        headOfficeSyncService.backupInvoicesToHeadOffice();
+        return true;
     }
 }

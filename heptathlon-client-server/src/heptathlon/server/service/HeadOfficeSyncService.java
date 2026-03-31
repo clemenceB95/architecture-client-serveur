@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +29,7 @@ public class HeadOfficeSyncService {
     private static final LocalTime DEFAULT_INVOICE_BACKUP_TIME = LocalTime.of(22, 0);
     private static final DateTimeFormatter BACKUP_TIMESTAMP_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final Locale JSON_NUMBER_LOCALE = Locale.US;
 
     private final ProductDAO productDAO;
     private final InvoiceDAO invoiceDAO;
@@ -192,7 +194,7 @@ public class HeadOfficeSyncService {
                     {
                       "id": %d,
                       "clientName": "%s",
-                      "totalAmount": %.2f,
+                      "totalAmount": %s,
                       "paymentMode": %s,
                       "billingDate": "%s",
                       "paid": %s,
@@ -201,7 +203,7 @@ public class HeadOfficeSyncService {
                     """.formatted(
                     invoice.getId(),
                     escapeJson(invoice.getClientName()),
-                    invoice.getTotalAmount(),
+                    formatJsonNumber(invoice.getTotalAmount()),
                     invoice.getPaymentMode() == null ? "null" : "\"" + invoice.getPaymentMode().name() + "\"",
                     invoice.getBillingDate(),
                     invoice.isPaid(),
@@ -219,18 +221,22 @@ public class HeadOfficeSyncService {
                     {
                       "productReference": "%s",
                       "quantity": %d,
-                      "unitPrice": %.2f,
-                      "lineTotal": %.2f
+                      "unitPrice": %s,
+                      "lineTotal": %s
                     }
                     """.formatted(
                     escapeJson(item.getProductReference()),
                     item.getQuantity(),
-                    item.getUnitPrice(),
-                    item.getLineTotal()
+                    formatJsonNumber(item.getUnitPrice()),
+                    formatJsonNumber(item.getLineTotal())
             ).indent(2).trim());
         }
 
         return "[\n" + String.join(",\n", itemJson) + "\n  ]";
+    }
+
+    private String formatJsonNumber(double value) {
+        return String.format(JSON_NUMBER_LOCALE, "%.2f", value);
     }
 
     private String escapeJson(String value) {

@@ -24,6 +24,7 @@ public class ServerMain {
                     service.getProductDAO(),
                     service.getInvoiceDAO()
             );
+            service.setHeadOfficeSyncService(headOfficeSyncService);
 
             Registry registry = LocateRegistry.createRegistry(1099);
             registry.rebind("StoreService", service);

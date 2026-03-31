@@ -339,7 +339,18 @@ public class ClientMain {
                     )
             );
 
+            JPanel backupPanel = createSectionPanel("Sauvegarde siege");
+            GridBagConstraints backupConstraints = createConstraints();
+            addButtonRow(
+                    backupPanel,
+                    backupConstraints,
+                    0,
+                    createSecondaryButton("Sauvegarder les factures", this::handleTriggerInvoiceBackup)
+            );
+
             tab.add(revenuePanel);
+            tab.add(Box.createVerticalStrut(14));
+            tab.add(backupPanel);
             tab.add(Box.createVerticalGlue());
             return tab;
         }
@@ -803,6 +814,15 @@ public class ClientMain {
                 return;
             }
             showInvoice("Facture payee.\n\n", invoice);
+        }
+
+        private void handleTriggerInvoiceBackup() throws Exception {
+            boolean triggered = service.triggerInvoiceBackup();
+            if (!triggered) {
+                log("Sauvegarde des factures indisponible.");
+                return;
+            }
+            log("Sauvegarde des factures declenchee. Verifie le dossier head-office/backups.");
         }
 
         private void handleShowRevenue() throws Exception {

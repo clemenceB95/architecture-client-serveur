@@ -33,4 +33,6 @@ public interface StoreService extends Remote {
     List<Invoice> getInvoicesByDate(LocalDate date) throws RemoteException;
 
     double getRevenueByDate(LocalDate date) throws RemoteException;
+
+    boolean triggerInvoiceBackup() throws RemoteException;
 }
