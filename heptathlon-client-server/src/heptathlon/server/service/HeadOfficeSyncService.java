@@ -44,13 +44,13 @@ public class HeadOfficeSyncService {
         this.priceUpdatesFile = Path.of(
                 System.getenv().getOrDefault(
                         "HEPTATHLON_HEAD_OFFICE_PRICE_FILE",
-                        "heptathlon-client-server/head-office/incoming/price-updates.csv"
+                        "head-office/incoming/price-updates.csv"
                 )
         );
         this.invoiceBackupsDirectory = Path.of(
                 System.getenv().getOrDefault(
                         "HEPTATHLON_HEAD_OFFICE_BACKUP_DIR",
-                        "heptathlon-client-server/head-office/backups"
+                        "head-office/backups"
                 )
         );
     }
