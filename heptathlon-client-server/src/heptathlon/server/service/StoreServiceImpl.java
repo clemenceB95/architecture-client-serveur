@@ -172,7 +172,6 @@ public class StoreServiceImpl extends UnicastRemoteObject implements StoreServic
             return false;
         }
 
-        headOfficeSyncService.backupInvoicesToHeadOffice();
-        return true;
+        return headOfficeSyncService.backupInvoicesToHeadOffice();
     }
 }

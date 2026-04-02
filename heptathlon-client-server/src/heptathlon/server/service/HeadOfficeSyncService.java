@@ -69,7 +69,7 @@ public class HeadOfficeSyncService {
         );
         scheduleTask(
                 "sauvegarde automatique des factures",
-                this::backupInvoicesToHeadOffice,
+                () -> backupInvoicesToHeadOffice(),
                 DEFAULT_INVOICE_BACKUP_TIME,
                 invoiceBackupIntervalSeconds
         );
@@ -161,7 +161,7 @@ public class HeadOfficeSyncService {
         }
     }
 
-    public void backupInvoicesToHeadOffice() {
+    public boolean backupInvoicesToHeadOffice() {
         List<Invoice> invoices = invoiceDAO.findAll();
         String timestamp = LocalDateTime.now().format(BACKUP_TIMESTAMP_FORMAT);
         Path backupFile = invoiceBackupsDirectory.resolve("invoices-" + timestamp + ".json");
@@ -170,8 +170,10 @@ public class HeadOfficeSyncService {
             Files.createDirectories(invoiceBackupsDirectory);
             Files.writeString(backupFile, toJson(invoices), StandardCharsets.UTF_8);
             logger.info("Sauvegarde des factures terminee: " + backupFile.toAbsolutePath());
+            return true;
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Ecriture impossible de la sauvegarde des factures", e);
+            return false;
         }
     }
 

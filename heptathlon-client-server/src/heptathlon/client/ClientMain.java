@@ -292,7 +292,7 @@ public class ClientMain {
                     gbc,
                     3,
                     createActionRow(
-                            createPrimaryButton("Commander et payer en magasin", this::handlePurchase),
+                            createPrimaryButton("Commander pour paiement en magasin", this::handlePurchase),
                             createSecondaryButton("Acheter et payer en ligne", this::handlePurchaseAndPay)
                     )
             );
@@ -819,7 +819,7 @@ public class ClientMain {
         private void handleTriggerInvoiceBackup() throws Exception {
             boolean triggered = service.triggerInvoiceBackup();
             if (!triggered) {
-                log("Sauvegarde des factures indisponible.");
+                log("Echec de la sauvegarde des factures vers le siege.");
                 return;
             }
             log("Sauvegarde des factures declenchee. Verifie le dossier head-office/backups.");

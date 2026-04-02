@@ -12,13 +12,16 @@ import java.util.logging.Logger;
 public class ServerMain {
 
     private static final Logger logger = Logger.getLogger(ServerMain.class.getName());
+    private static final String RESET_ON_START_ENV = "HEPTATHLON_DB_RESET_ON_START";
 
     public static void main(String[] args) {
         try {
-            logger.info("Initialisation de la base de données...");
-            DatabaseInitializer.initialize();
+            boolean resetDatabase = Boolean.parseBoolean(System.getenv(RESET_ON_START_ENV));
+            logger.info(() -> "Initialisation de la base de donnees..."
+                    + (resetDatabase ? " Mode reinitialisation active." : " Conservation des donnees existantes."));
+            DatabaseInitializer.initialize(resetDatabase);
 
-            logger.info("Création du service RMI...");
+            logger.info("Creation du service RMI...");
             StoreServiceImpl service = new StoreServiceImpl();
             HeadOfficeSyncService headOfficeSyncService = new HeadOfficeSyncService(
                     service.getProductDAO(),
@@ -30,9 +33,9 @@ public class ServerMain {
             registry.rebind("StoreService", service);
             headOfficeSyncService.start();
 
-            logger.info("Serveur RMI démarré sur le port 1099.");
+            logger.info("Serveur RMI demarre sur le port 1099.");
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Erreur au démarrage du serveur", e);
+            logger.log(Level.SEVERE, "Erreur au demarrage du serveur", e);
         }
     }
 }
