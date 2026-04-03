@@ -7,10 +7,24 @@
     <artifactId>heptathlon-client-server</artifactId>
     <version>1.0-SNAPSHOT</version>
     <name>heptathlon-client-server</name>
+    <url>https://github.com/clemenceB95/architecture-client-serveur</url>
+    <description>
+        Application Java client-serveur pour une enseigne d'articles de sport, avec interface Swing,
+        service RMI, persistance MySQL, gestion du catalogue, achats, facturation, suivi du chiffre
+        d'affaires et synchronisation simple avec un siege.
+    </description>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.jupiter.version>5.12.2</junit.jupiter.version>
+        <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
+        <jacoco.plugin.version>0.8.13</jacoco.plugin.version>
+        <checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
+        <maven.site.plugin.version>3.21.0</maven.site.plugin.version>
+        <maven.project.info.reports.plugin.version>3.9.0</maven.project.info.reports.plugin.version>
+        <maven.surefire.report.plugin.version>3.5.3</maven.surefire.report.plugin.version>
+        <maven.jxr.plugin.version>3.6.0</maven.jxr.plugin.version>
     </properties>
 
     <dependencies>
@@ -19,11 +33,15 @@
             <artifactId>mysql-connector-j</artifactId>
             <version>9.6.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
-        <sourceDirectory>src</sourceDirectory>
-
         <resources>
             <resource>
                 <directory>database</directory>
@@ -43,6 +61,92 @@
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <useFile>true</useFile>
+                    <printSummary>true</printSummary>
+                    <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                    <trimStackTrace>false</trimStackTrace>
+                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-jacoco-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle.plugin.version}</version>
+                <configuration>
+                    <configLocation>sun_checks.xml</configLocation>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <consoleOutput>true</consoleOutput>
+                    <failsOnError>false</failsOnError>
+                    <linkXRef>true</linkXRef>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <version>${maven.site.plugin.version}</version>
+            </plugin>
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>${maven.project.info.reports.plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-report-plugin</artifactId>
+                <version>${maven.surefire.report.plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle.plugin.version}</version>
+                <configuration>
+                    <configLocation>sun_checks.xml</configLocation>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <linkXRef>true</linkXRef>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jxr-plugin</artifactId>
+                <version>${maven.jxr.plugin.version}</version>
+            </plugin>
+        </plugins>
+    </reporting>
 </project>
