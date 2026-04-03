@@ -1,7 +1,6 @@
 package heptathlon.client;
 
 import heptathlon.common.model.Invoice;
-import heptathlon.common.model.InvoiceItem;
 import heptathlon.common.model.PaymentMode;
 import heptathlon.common.model.Product;
 import heptathlon.common.model.PurchaseItem;
@@ -685,28 +684,16 @@ public class ClientMain {
             }
 
             List<String> references = service.searchAvailableReferencesByFamily(family);
-            StringBuilder builder = new StringBuilder();
-            builder.append("Famille : ").append(family).append('\n');
-            builder.append("--------------------------------------------------\n");
-
-            if (references == null || references.isEmpty()) {
-                builder.append("Aucun produit disponible dans cette famille.");
-                log(builder.toString());
-                return;
-            }
-
-            for (String reference : references) {
-                Product product = service.getProductByReference(reference);
-                if (product != null) {
-                    builder.append(product.getReference())
-                            .append(" | prix: ")
-                            .append(String.format("%.2f", product.getUnitPrice()))
-                            .append(" EUR | stock: ")
-                            .append(product.getStockQuantity())
-                            .append('\n');
+            List<Product> products = new ArrayList<>();
+            if (references != null) {
+                for (String reference : references) {
+                    Product product = service.getProductByReference(reference);
+                    if (product != null) {
+                        products.add(product);
+                    }
                 }
             }
-            log(builder.toString());
+            log(ClientViewSupport.formatFamilyProducts(family, products));
         }
 
         private void handleShowProduct() throws Exception {
@@ -716,7 +703,7 @@ public class ClientMain {
                 log("Produit introuvable.");
                 return;
             }
-            log(formatProduct(product));
+            log(ClientViewSupport.formatProduct(product));
         }
 
         private void handlePurchase() throws Exception {
@@ -829,54 +816,14 @@ public class ClientMain {
             LocalDate date = getSelectedRevenueDate();
             double revenue = service.getRevenueByDate(date);
             List<Invoice> invoices = service.getInvoicesByDate(date);
-            StringBuilder builder = new StringBuilder();
-            builder.append("Chiffre d'affaires du ").append(date).append('\n');
-            builder.append("--------------------------------------------------\n");
-            builder.append("Montant encaisse : ").append(String.format("%.2f", revenue)).append(" EUR\n");
-            builder.append("Nombre de factures : ").append(invoices.size()).append('\n');
-            builder.append("Factures payees : ").append(countPaidInvoices(invoices)).append('\n');
-            builder.append("Factures en attente : ").append(invoices.size() - countPaidInvoices(invoices)).append('\n');
-            log(builder.toString());
+            log(ClientViewSupport.formatRevenue(date, revenue, invoices));
         }
 
         private void handleShowDailyStatistics() throws Exception {
             LocalDate date = getSelectedRevenueDate();
             List<Invoice> invoices = service.getInvoicesByDate(date);
             double paidRevenue = service.getRevenueByDate(date);
-            double totalBilled = invoices.stream().mapToDouble(Invoice::getTotalAmount).sum();
-            int paidCount = countPaidInvoices(invoices);
-            int unpaidCount = invoices.size() - paidCount;
-
-            StringBuilder builder = new StringBuilder();
-            builder.append("Statistiques du ").append(date).append('\n');
-            builder.append("==================================================\n");
-            builder.append("Nombre total de factures : ").append(invoices.size()).append('\n');
-            builder.append("Factures payees         : ").append(paidCount).append('\n');
-            builder.append("Factures non payees     : ").append(unpaidCount).append('\n');
-            builder.append("Montant total facture   : ").append(String.format("%.2f", totalBilled)).append(" EUR\n");
-            builder.append("Chiffre d'affaires      : ").append(String.format("%.2f", paidRevenue)).append(" EUR\n");
-            builder.append("Ticket moyen            : ")
-                    .append(String.format("%.2f", invoices.isEmpty() ? 0.0 : totalBilled / invoices.size()))
-                    .append(" EUR\n\n");
-
-            if (invoices.isEmpty()) {
-                builder.append("Aucune facture pour cette date.");
-            } else {
-                builder.append("Liste des factures :\n");
-                for (Invoice invoice : invoices) {
-                    builder.append("- #")
-                            .append(invoice.getId())
-                            .append(" | ")
-                            .append(invoice.getClientName())
-                            .append(" | ")
-                            .append(invoice.isPaid() ? "payee" : "en attente")
-                            .append(" | ")
-                            .append(String.format("%.2f", invoice.getTotalAmount()))
-                            .append(" EUR\n");
-                }
-            }
-
-            log(builder.toString());
+            log(ClientViewSupport.formatDailyStatistics(date, invoices, paidRevenue));
         }
 
         private void handleAddStock() throws Exception {
@@ -888,68 +835,34 @@ public class ClientMain {
                 return;
             }
             Product product = service.getProductByReference(reference);
-            log("Stock mis a jour.\n\n" + (product == null ? reference : formatProduct(product)));
+            log("Stock mis a jour.\n\n" + (product == null ? reference : ClientViewSupport.formatProduct(product)));
             loadFamilies();
             loadPurchaseProducts();
         }
 
         private void handleShowStock() throws Exception {
             List<Product> products = service.getAllProducts();
-            StringBuilder builder = new StringBuilder();
-            builder.append("Stock disponible\n");
-            builder.append("--------------------------------------------------\n");
-
-            for (Product product : products) {
-                builder.append(product.getReference())
-                        .append(" | ")
-                        .append(product.getFamily())
-                        .append(" | ")
-                        .append(String.format("%.2f", product.getUnitPrice()))
-                        .append(" EUR | stock: ")
-                        .append(product.getStockQuantity())
-                        .append('\n');
-            }
-            log(builder.toString());
+            log(ClientViewSupport.formatStock(products));
         }
 
         private String requireText(JTextField field, String fieldName) {
-            String value = field.getText();
-            if (value == null || value.trim().isEmpty()) {
-                throw new IllegalArgumentException("Saisie invalide pour " + fieldName + ".");
-            }
-            return value.trim();
+            return ClientViewSupport.requireText(field.getText(), fieldName);
         }
 
         private int requirePositiveSpinnerValue(JSpinner spinner, String fieldName) {
-            Object value = spinner.getValue();
-            if (!(value instanceof Number number) || number.intValue() <= 0) {
-                throw new IllegalArgumentException("Saisie invalide pour " + fieldName + ".");
-            }
-            return number.intValue();
+            return ClientViewSupport.requirePositiveNumber(spinner.getValue(), fieldName);
         }
 
         private List<PurchaseItem> buildPurchaseItems() {
-            if (purchaseCartItems.isEmpty()) {
-                throw new IllegalArgumentException("Ajoute au moins un produit au panier.");
-            }
-
-            List<PurchaseItem> items = new ArrayList<>();
+            List<ClientViewSupport.ProductQuantity> cartItems = new ArrayList<>();
             for (CartItem item : purchaseCartItems) {
-                items.add(new PurchaseItem(item.product().getReference(), item.quantity()));
+                cartItems.add(new ClientViewSupport.ProductQuantity(item.product(), item.quantity()));
             }
-            return items;
+            return ClientViewSupport.buildPurchaseItems(cartItems);
         }
 
         private int parsePositiveInteger(String input, String fieldName) {
-            try {
-                int value = Integer.parseInt(input.trim());
-                if (value <= 0) {
-                    throw new IllegalArgumentException("Saisie invalide pour " + fieldName + ".");
-                }
-                return value;
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Saisie invalide pour " + fieldName + ".");
-            }
+            return ClientViewSupport.parsePositiveInteger(input, fieldName);
         }
 
         private LocalDate getSelectedRevenueDate() {
@@ -960,13 +873,7 @@ public class ClientMain {
         }
 
         private int countPaidInvoices(List<Invoice> invoices) {
-            int count = 0;
-            for (Invoice invoice : invoices) {
-                if (invoice.isPaid()) {
-                    count++;
-                }
-            }
-            return count;
+            return ClientViewSupport.countPaidInvoices(invoices);
         }
 
         private void handleDownloadInvoice() throws Exception {
@@ -990,18 +897,18 @@ public class ClientMain {
             }
 
             try {
-                Files.writeString(targetPath, formatInvoice(lastPurchasedInvoice), StandardCharsets.UTF_8);
+                Files.writeString(targetPath, ClientViewSupport.formatInvoice(lastPurchasedInvoice), StandardCharsets.UTF_8);
             } catch (IOException e) {
                 showError("Impossible d'enregistrer la facture : " + e.getMessage());
             }
         }
 
         private void showInvoice(String prefix, Invoice invoice) {
-            log(prefix + formatInvoice(invoice));
+            log(prefix + ClientViewSupport.formatInvoice(invoice));
         }
 
         private void showPurchaseInvoice(String prefix, Invoice invoice) {
-            lastPurchaseResultMessage = prefix + formatInvoice(invoice);
+            lastPurchaseResultMessage = prefix + ClientViewSupport.formatInvoice(invoice);
             showPurchaseResultInSidePanel = true;
             refreshResultsPanel();
         }
@@ -1046,11 +953,7 @@ public class ClientMain {
             }
 
             Product product = selectedOption.product();
-            purchaseStockLabel.setText(
-                    "Famille : " + product.getFamily()
-                            + " | Prix : " + String.format("%.2f", product.getUnitPrice()) + " EUR"
-                            + " | Stock disponible : " + selectedOption.availableStock()
-            );
+            purchaseStockLabel.setText(ClientViewSupport.formatSelectedProductStock(product, selectedOption.availableStock()));
         }
 
         private void refreshPurchaseCartPanel() {
@@ -1094,8 +997,7 @@ public class ClientMain {
             mainLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
 
             JLabel detailsLabel = createInlineLabel(
-                    "Quantite : x" + item.quantity()
-                            + " | Total : " + String.format("%.2f", item.product().getUnitPrice() * item.quantity()) + " EUR"
+                    ClientViewSupport.formatCartItem(item.product(), item.quantity())
             );
             detailsLabel.setForeground(new Color(88, 101, 118));
 
@@ -1117,12 +1019,11 @@ public class ClientMain {
             row.setBorder(new EmptyBorder(6, 4, 0, 4));
             row.setLayout(new BoxLayout(row, BoxLayout.X_AXIS));
 
-            double total = 0;
+            List<ClientViewSupport.ProductQuantity> cartItems = new ArrayList<>();
             for (CartItem item : purchaseCartItems) {
-                total += item.product().getUnitPrice() * item.quantity();
+                cartItems.add(new ClientViewSupport.ProductQuantity(item.product(), item.quantity()));
             }
-
-            JLabel totalLabel = new JLabel("Total panier : " + String.format("%.2f", total) + " EUR");
+            JLabel totalLabel = new JLabel(ClientViewSupport.formatCartTotal(cartItems));
             totalLabel.setForeground(PRIMARY_BLUE_DARK);
             totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
 
@@ -1202,59 +1103,6 @@ public class ClientMain {
         }
 
         private record CartItem(Product product, int quantity) {
-        }
-
-        private String formatStockQuantity(Product product) {
-            Integer stockQuantity = product.getStockQuantity();
-            return stockQuantity == null ? "NULL" : String.valueOf(stockQuantity);
-        }
-
-        private String formatProduct(Product product) {
-            return """
-                    Produit
-                    --------------------------------------------------
-                    Reference : %s
-                    Famille   : %s
-                    Prix      : %.2f EUR
-                    Stock     : %s
-                    """.formatted(
-                    product.getReference(),
-                    product.getFamily(),
-                    product.getUnitPrice(),
-                    formatStockQuantity(product)
-            ).trim();
-        }
-
-        private String formatInvoice(Invoice invoice) {
-            StringBuilder builder = new StringBuilder();
-            builder.append("Facture #").append(invoice.getId()).append('\n');
-            builder.append("Client : ").append(invoice.getClientName()).append('\n');
-            builder.append("Date   : ").append(invoice.getBillingDate()).append('\n');
-            builder.append("Statut : ").append(invoice.isPaid() ? "payee" : "en attente de paiement").append('\n');
-            builder.append("Mode   : ")
-                    .append(invoice.getPaymentMode() == null ? "a definir" : invoice.getPaymentMode())
-                    .append('\n');
-            builder.append("Articles :\n");
-
-            List<InvoiceItem> items = invoice.getItems();
-            if (items == null || items.isEmpty()) {
-                builder.append("- Aucun article\n");
-            } else {
-                for (InvoiceItem item : items) {
-                    builder.append("- ")
-                            .append(item.getProductReference())
-                            .append(" x")
-                            .append(item.getQuantity())
-                            .append(" @ ")
-                            .append(String.format("%.2f", item.getUnitPrice()))
-                            .append(" EUR = ")
-                            .append(String.format("%.2f", item.getLineTotal()))
-                            .append(" EUR\n");
-                }
-            }
-
-            builder.append("Total : ").append(String.format("%.2f", invoice.getTotalAmount())).append(" EUR");
-            return builder.toString();
         }
 
         private void log(String message) {
